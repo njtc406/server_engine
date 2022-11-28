@@ -93,7 +93,11 @@ func (cls *Cluster) readLocalClusterConfig(nodeId int) ([]NodeInfo, []NodeInfo, 
 	}
 
 	if nodeId != 0 && (len(nodeInfoList) != 1) {
-		return nil, nil, fmt.Errorf("%d configurations were found for the configuration with node ID %d!", len(nodeInfoList), nodeId)
+		if dyNodeCache == nil {
+			return nil, nil, fmt.Errorf("%d configurations were found for the configuration with node ID %d!", len(nodeInfoList), nodeId)
+		}
+		//动态节点配置
+		nodeInfoList = append(nodeInfoList, *dyNodeCache)
 	}
 
 	for i, _ := range nodeInfoList {

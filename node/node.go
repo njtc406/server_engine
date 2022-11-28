@@ -1,6 +1,7 @@
 package node
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/njtc406/server_engine/cluster"
@@ -48,7 +49,7 @@ func init() {
 
 	console.RegisterCommandBool("help", false, "<-help> This help.", usage)
 	console.RegisterCommandString("name", "", "<-name nodeName> Node's name.", setName)
-	console.RegisterCommandString("start", "", "<-start nodeid=nodeid> Run originserver.", startNode)
+	console.RegisterCommandString("start", "", "<-start nodeid=nodeid conf=jsonconfstr> Run originserver.", startNode)
 	console.RegisterCommandString("stop", "", "<-stop nodeid=nodeid> Stop originserver process.", stopNode)
 	console.RegisterCommandString("config", "", "<-config path> Configuration file path.", setConfigPath)
 	console.RegisterCommandString("console", "", "<-console true|false> Turn on or off screen log output.", openConsole)
@@ -233,7 +234,8 @@ func startNode(args interface{}) error {
 	}
 
 	sParam := strings.Split(param, "=")
-	if len(sParam) != 2 {
+	lenParam := len(sParam)
+	if lenParam != 2 || lenParam != 4 {
 		return fmt.Errorf("invalid option %s", param)
 	}
 	if sParam[0] != "nodeid" {
@@ -242,6 +244,22 @@ func startNode(args interface{}) error {
 	nodeId, err := strconv.Atoi(sParam[1])
 	if err != nil {
 		return fmt.Errorf("invalid option %s", param)
+	}
+
+	if lenParam == 4 {
+		//解析动态节点配置
+		if sParam[2] != "conf" {
+			return fmt.Errorf("invalid option %s", param)
+		}
+
+		var nodeConf = &cluster.NodeInfo{}
+		err := json.Unmarshal([]byte(sParam[3]), nodeConf)
+		if err != nil {
+			return err
+		}
+
+		//缓存配置
+		cluster.AddNodeConfCache(nodeConf)
 	}
 
 	timer.StartTimer(10*time.Millisecond, 1000000)
