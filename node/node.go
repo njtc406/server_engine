@@ -236,20 +236,20 @@ func startNode(args interface{}) error {
 	sParam := strings.Split(param, "=")
 	lenParam := len(sParam)
 	if lenParam != 2 || lenParam != 4 {
-		return fmt.Errorf("invalid option %s", param)
+		return fmt.Errorf("invalid number of option  %s", param)
 	}
 	if sParam[0] != "nodeid" {
 		return fmt.Errorf("invalid option %s", param)
 	}
 	nodeId, err := strconv.Atoi(sParam[1])
 	if err != nil {
-		return fmt.Errorf("invalid option %s", param)
+		return fmt.Errorf("invalid nodeid : %s", sParam[1])
 	}
 
 	if lenParam == 4 {
 		//解析动态节点配置
 		if sParam[2] != "conf" {
-			return fmt.Errorf("invalid option %s", param)
+			return fmt.Errorf("invalid option: conf %s", param)
 		}
 
 		var nodeConf = &cluster.NodeInfo{}
