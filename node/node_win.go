@@ -1,0 +1,12 @@
+//go:build windows
+// +build windows
+
+package node
+
+func KillProcess(processId int) {
+
+}
+
+func GetBuildOSType() BuildOSType {
+	return Windows
+}
