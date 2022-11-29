@@ -6,7 +6,6 @@ import (
 	"github.com/njtc406/server_engine/log"
 	"github.com/njtc406/server_engine/rpc"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -69,26 +68,15 @@ func (cls *Cluster) readServiceConfig(filepath string) (interface{}, map[string]
 func (cls *Cluster) readLocalClusterConfig(nodeId int) ([]NodeInfo, []NodeInfo, error) {
 	var nodeInfoList []NodeInfo
 	var masterDiscoverNodeList []NodeInfo
-	clusterCfgPath := strings.TrimRight(configDir, "/") + "/cluster"
-	fileInfoList, err := os.ReadDir(clusterCfgPath)
+	clusterCfgPath := strings.TrimRight(configDir, "/") + "/cluster/cluster.json"
+	localNodeInfoList, err := cls.ReadClusterConfig(clusterCfgPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Read dir %s is fail :%+v", clusterCfgPath, err)
+		return nil, nil, fmt.Errorf("read cluster config error:%+v", err)
 	}
-
-	//读取任何文件,只读符合格式的配置,目录下的文件可以自定义分文件
-	for _, f := range fileInfoList {
-		if f.IsDir() == false {
-			filePath := strings.TrimRight(strings.TrimRight(clusterCfgPath, "/"), "\\") + "/" + f.Name()
-			localNodeInfoList, err := cls.ReadClusterConfig(filePath)
-			if err != nil {
-				return nil, nil, fmt.Errorf("read file path %s is error:%+v", filePath, err)
-			}
-			masterDiscoverNodeList = append(masterDiscoverNodeList, localNodeInfoList.MasterDiscoveryNode...)
-			for _, nodeInfo := range localNodeInfoList.NodeList {
-				if nodeInfo.NodeId == nodeId || nodeId == 0 {
-					nodeInfoList = append(nodeInfoList, nodeInfo)
-				}
-			}
+	masterDiscoverNodeList = append(masterDiscoverNodeList, localNodeInfoList.MasterDiscoveryNode...)
+	for _, nodeInfo := range localNodeInfoList.NodeList {
+		if nodeInfo.NodeId == nodeId || nodeId == 0 {
+			nodeInfoList = append(nodeInfoList, nodeInfo)
 		}
 	}
 
@@ -115,68 +103,52 @@ func (cls *Cluster) readLocalClusterConfig(nodeId int) ([]NodeInfo, []NodeInfo, 
 }
 
 func (cls *Cluster) readLocalService(localNodeId int) error {
-	clusterCfgPath := strings.TrimRight(configDir, "/") + "/cluster"
-	fileInfoList, err := os.ReadDir(clusterCfgPath)
-	if err != nil {
-		return fmt.Errorf("Read dir %s is fail :%+v", clusterCfgPath, err)
-	}
+	clusterCfgPath := strings.TrimRight(configDir, "/") + "/cluster/service.json"
 
 	var globalCfg interface{}
 	publicService := map[string]interface{}{}
 	nodeService := map[string]interface{}{}
 
-	//读取任何文件,只读符合格式的配置,目录下的文件可以自定义分文件
-	for _, f := range fileInfoList {
-		if f.IsDir() == true {
-			continue
-		}
+	currGlobalCfg, serviceConfig, mapNodeService, err := cls.readServiceConfig(clusterCfgPath)
+	if err != nil {
+		return fmt.Errorf("read service config error: %s", err)
+	}
 
-		if filepath.Ext(f.Name()) != ".json" {
-			continue
+	if currGlobalCfg != nil {
+		//不允许重复的配置global配置
+		if globalCfg != nil {
+			return fmt.Errorf("[Global] does not allow repeated service config")
 		}
+		globalCfg = currGlobalCfg
+	}
 
-		filePath := strings.TrimRight(strings.TrimRight(clusterCfgPath, "/"), "\\") + "/" + f.Name()
-		currGlobalCfg, serviceConfig, mapNodeService, err := cls.readServiceConfig(filePath)
-		if err != nil {
-			continue
-		}
-
-		if currGlobalCfg != nil {
-			//不允许重复的配置global配置
-			if globalCfg != nil {
-				return fmt.Errorf("[Global] does not allow repeated configuration in %s.", f.Name())
+	//保存公共配置
+	for _, s := range cls.localNodeInfo.ServiceList {
+		for {
+			//取公共服务配置
+			pubCfg, ok := serviceConfig[s]
+			if ok == true {
+				if _, publicOk := publicService[s]; publicOk == true {
+					return fmt.Errorf("public service [%s] does not allow repeated configuration.", s)
+				}
+				publicService[s] = pubCfg
 			}
-			globalCfg = currGlobalCfg
-		}
 
-		//保存公共配置
-		for _, s := range cls.localNodeInfo.ServiceList {
-			for {
-				//取公共服务配置
-				pubCfg, ok := serviceConfig[s]
-				if ok == true {
-					if _, publicOk := publicService[s]; publicOk == true {
-						return fmt.Errorf("public service [%s] does not allow repeated configuration in %s.", s, f.Name())
-					}
-					publicService[s] = pubCfg
-				}
-
-				//取指定结点配置的服务
-				nodeServiceCfg, ok := mapNodeService[localNodeId]
-				if ok == false {
-					break
-				}
-				nodeCfg, ok := nodeServiceCfg[s]
-				if ok == false {
-					break
-				}
-
-				if _, nodeOK := nodeService[s]; nodeOK == true {
-					return fmt.Errorf("NodeService NodeId[%d] Service[%s] does not allow repeated configuration in %s.", cls.localNodeInfo.NodeId, s, f.Name())
-				}
-				nodeService[s] = nodeCfg
+			//取指定结点配置的服务
+			nodeServiceCfg, ok := mapNodeService[localNodeId]
+			if ok == false {
 				break
 			}
+			nodeCfg, ok := nodeServiceCfg[s]
+			if ok == false {
+				break
+			}
+
+			if _, nodeOK := nodeService[s]; nodeOK == true {
+				return fmt.Errorf("NodeService NodeId[%d] Service[%s] does not allow repeated configuration.", cls.localNodeInfo.NodeId, s)
+			}
+			nodeService[s] = nodeCfg
+			break
 		}
 	}
 

@@ -88,6 +88,7 @@ func (client *TCPClient) GetCloseFlag() bool {
 
 func (client *TCPClient) dial() net.Conn {
 	for {
+		log.SDebug("begin connect [%s]", client.Addr)
 		conn, err := net.Dial("tcp", client.Addr)
 		if client.closeFlag {
 			return conn
