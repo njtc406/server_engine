@@ -235,7 +235,7 @@ func startNode(args interface{}) error {
 
 	sParam := strings.Split(param, "=")
 	lenParam := len(sParam)
-	if lenParam != 2 || lenParam != 4 {
+	if lenParam != 2 && lenParam != 4 {
 		return fmt.Errorf("invalid number of option  %s", param)
 	}
 	if sParam[0] != "nodeid" {
