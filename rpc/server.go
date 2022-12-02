@@ -15,8 +15,8 @@ import (
 type RpcProcessorType uint8
 
 const (
-	RpcProcessorJson   RpcProcessorType = 0
-	RpcProcessorGoGoPB RpcProcessorType = 1
+	RpcProcessorJson   RpcProcessorType = 0 //json处理器
+	RpcProcessorGoGoPB RpcProcessorType = 1 //protobuf处理器
 )
 
 // var processor IRpcProcessor = &JsonProcessor{}

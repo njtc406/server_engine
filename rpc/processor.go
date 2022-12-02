@@ -1,5 +1,6 @@
 package rpc
 
+// rpc处理器
 type IRpcProcessor interface {
 	Marshal(v interface{}) ([]byte, error) //b表示自定义缓冲区，可以填nil，由系统自动分配
 	Unmarshal(data []byte, v interface{}) error

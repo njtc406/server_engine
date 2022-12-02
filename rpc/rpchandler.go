@@ -12,11 +12,13 @@ import (
 	"unicode/utf8"
 )
 
+// 本地最大缓存节点数量
 const maxClusterNode int = 128
 
 type FuncRpcClient func(nodeId int, serviceMethod string, client []*Client) (error, int)
 type FuncRpcServer func() *Server
 
+// 获取一个error类型的零值
 var nilError = reflect.Zero(reflect.TypeOf((*error)(nil)).Elem())
 
 type RpcError string
@@ -27,6 +29,7 @@ func (e RpcError) Error() string {
 	return string(e)
 }
 
+// 错误捕获
 func ConvertError(e error) RpcError {
 	if e == nil {
 		return NilError
@@ -36,6 +39,7 @@ func ConvertError(e error) RpcError {
 	return rpcErr
 }
 
+// XXX:不太明白为啥用反射
 type RpcMethodInfo struct {
 	method           reflect.Method
 	inParamValue     reflect.Value
@@ -55,6 +59,7 @@ type IRpcHandlerChannel interface {
 	PushRpcRequest(rpcRequest *RpcRequest) error
 }
 
+// rpc处理器
 type RpcHandler struct {
 	IRpcHandlerChannel
 
@@ -64,7 +69,7 @@ type RpcHandler struct {
 	funcRpcClient   FuncRpcClient
 	funcRpcServer   FuncRpcServer
 
-	pClientList []*Client
+	pClientList []*Client //rpc客户端列表
 }
 
 type TriggerRpcEvent func(bConnect bool, clientSeq uint32, nodeId int)

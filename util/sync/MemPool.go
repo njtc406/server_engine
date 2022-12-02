@@ -81,6 +81,7 @@ func (pool *PoolEx) Get() IPoolData {
 
 func (pool *PoolEx) Put(data IPoolData) {
 	if data.IsRef() == false {
+		//已经释放过了
 		panic("Repeatedly freeing memory")
 	}
 	//提前解引用，防止递归释放

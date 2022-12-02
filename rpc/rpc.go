@@ -7,19 +7,19 @@ import (
 )
 
 type RpcRequest struct {
-	ref            bool
-	RpcRequestData IRpcRequestData
+	ref            bool            //数据是否正在被使用
+	RpcRequestData IRpcRequestData //请求的数据信息
 
-	inParam    interface{}
+	inParam    interface{} //参数
 	localReply interface{}
 
-	requestHandle RequestHandler
-	callback      *reflect.Value
-	rpcProcessor  IRpcProcessor
+	requestHandle RequestHandler //请求的处理函数
+	callback      *reflect.Value //回调
+	rpcProcessor  IRpcProcessor  //消息处理器
 }
 
 type RpcResponse struct {
-	RpcResponseData IRpcResponseData
+	RpcResponseData IRpcResponseData //回复的数据信息
 }
 
 type Responder = RequestHandler
@@ -28,10 +28,12 @@ func (r *Responder) IsInvalid() bool {
 	return reflect.ValueOf(*r).Pointer() == reflect.ValueOf(reqHandlerNull).Pointer()
 }
 
+// rpc req对象池(用于生成请求对象)
 var rpcRequestPool = sync.NewPoolEx(make(chan sync.IPoolData, 10240), func() sync.IPoolData {
 	return &RpcRequest{}
 })
 
+// rpc call对象池
 var rpcCallPool = sync.NewPoolEx(make(chan sync.IPoolData, 10240), func() sync.IPoolData {
 	return &Call{done: make(chan *Call, 1)}
 })
@@ -47,7 +49,7 @@ type IRpcRequestData interface {
 type IRpcResponseData interface {
 	GetSeq() uint64
 	GetErr() *RpcError
-	GetReply() []byte
+	GetReply() []byte //获取回复信息
 }
 
 type IRawInputArgs interface {
@@ -66,14 +68,14 @@ type Call struct {
 	ref           bool
 	Seq           uint64
 	ServiceMethod string
-	Reply         interface{}
-	Response      *RpcResponse
+	Reply         interface{}  //是否需要回复
+	Response      *RpcResponse //回复信息
 	Err           error
-	done          chan *Call // Strobes when call is complete.
+	done          chan *Call // 当call完成时的通知通道
 	connId        int
 	callback      *reflect.Value
 	rpcHandler    IRpcHandler
-	callTime      time.Time
+	callTime      time.Time //开始call的时间
 }
 
 func (slf *RpcRequest) Clear() *RpcRequest {

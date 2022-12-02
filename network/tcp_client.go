@@ -9,24 +9,24 @@ import (
 
 type TCPClient struct {
 	sync.Mutex
-	Addr            string
-	ConnNum         int
+	Addr            string //连接地址
+	ConnNum         int    //连接数量
 	ConnectInterval time.Duration
 	PendingWriteNum int
-	ReadDeadline    time.Duration
-	WriteDeadline   time.Duration
-	AutoReconnect   bool
+	ReadDeadline    time.Duration //读取数据超时时间
+	WriteDeadline   time.Duration //写数据超时时间
+	AutoReconnect   bool          //是否自动重连
 	NewAgent        func(*TCPConn) Agent
 	cons            ConnSet
 	wg              sync.WaitGroup
-	closeFlag       bool
+	closeFlag       bool //连接是否关闭
 
 	// msg parser
 	LenMsgLen    int
-	MinMsgLen    uint32
-	MaxMsgLen    uint32
-	LittleEndian bool
-	msgParser    *MsgParser
+	MinMsgLen    uint32     //最小数据长度
+	MaxMsgLen    uint32     //最大数据长度
+	LittleEndian bool       //是否是小端格式
+	msgParser    *MsgParser //消息解析器
 }
 
 func (client *TCPClient) Start() {
