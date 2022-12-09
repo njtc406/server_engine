@@ -25,10 +25,11 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 type NodeInfo struct {
 	NodeId               int32    `protobuf:"varint,1,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
 	NodeName             string   `protobuf:"bytes,2,opt,name=NodeName,proto3" json:"NodeName,omitempty"`
-	ListenAddr           string   `protobuf:"bytes,3,opt,name=ListenAddr,proto3" json:"ListenAddr,omitempty"`
-	MaxRpcParamLen       uint32   `protobuf:"varint,4,opt,name=MaxRpcParamLen,proto3" json:"MaxRpcParamLen,omitempty"`
-	Private              bool     `protobuf:"varint,5,opt,name=Private,proto3" json:"Private,omitempty"`
-	PublicServiceList    []string `protobuf:"bytes,6,rep,name=PublicServiceList,proto3" json:"PublicServiceList,omitempty"`
+	Version              int32    `protobuf:"varint,3,opt,name=Version,proto3" json:"Version,omitempty"`
+	ListenAddr           string   `protobuf:"bytes,4,opt,name=ListenAddr,proto3" json:"ListenAddr,omitempty"`
+	MaxRpcParamLen       uint32   `protobuf:"varint,5,opt,name=MaxRpcParamLen,proto3" json:"MaxRpcParamLen,omitempty"`
+	Private              bool     `protobuf:"varint,6,opt,name=Private,proto3" json:"Private,omitempty"`
+	PublicServiceList    []string `protobuf:"bytes,7,rep,name=PublicServiceList,proto3" json:"PublicServiceList,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -79,6 +80,13 @@ func (m *NodeInfo) GetNodeName() string {
 		return m.NodeName
 	}
 	return ""
+}
+
+func (m *NodeInfo) GetVersion() int32 {
+	if m != nil {
+		return m.Version
+	}
+	return 0
 }
 
 func (m *NodeInfo) GetListenAddr() string {

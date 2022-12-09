@@ -5,10 +5,11 @@ option go_package = "./rpc";
 message NodeInfo{
     int32 NodeId = 1;
     string NodeName = 2;
-    string ListenAddr  = 3;
-    uint32 MaxRpcParamLen = 4;
-    bool Private = 5;
-    repeated string PublicServiceList = 6;
+    int32 Version = 3;
+    string ListenAddr  = 4;
+    uint32 MaxRpcParamLen = 5;
+    bool Private = 6;
+    repeated string PublicServiceList = 7;
 }
 
 //Client->Master

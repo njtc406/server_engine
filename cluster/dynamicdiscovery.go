@@ -13,11 +13,15 @@ const RegServiceDiscover = DynamicDiscoveryMasterName + ".RPC_RegServiceDiscover
 const SubServiceDiscover = DynamicDiscoveryClientName + ".RPC_SubServiceDiscover"
 const AddSubServiceDiscover = DynamicDiscoveryMasterName + ".RPC_AddSubServiceDiscover"
 
+const defaultNodeMapSize = 100
+
 type DynamicDiscoveryMaster struct {
 	service.Service
-
-	mapNodeInfo map[int32]struct{}
-	nodeInfo    []*rpc.NodeInfo
+	nodeMapSize  uint32                  //节点列表的大小
+	globNodeInfo map[int32]struct{}      //全局节点列表(version为0表示全局节点,全局节点对所有其他节点可见)
+	mapNodeInfo  map[int32]struct{}      //节点列表 map[nodeId]nodeInfo
+	versionMap   map[int32]map[int32]int //版本节点列表 map[version]map[nodeId]int
+	nodeInfo     []*rpc.NodeInfo
 }
 
 type DynamicDiscoveryClient struct {
@@ -42,9 +46,14 @@ func init() {
 	clientService.SetName(DynamicDiscoveryClientName)
 }
 
-func (ds *DynamicDiscoveryMaster) isRegNode(nodeId int32) bool {
-	_, ok := ds.mapNodeInfo[nodeId]
-	return ok
+func (ds *DynamicDiscoveryMaster) isRegNode(nodeId, version int32) bool {
+	var retOK bool
+	if _, ok := ds.mapNodeInfo[version]; ok {
+		_, ok = ds.mapNodeInfo[version][nodeId]
+		retOK = ok
+	}
+
+	return retOK
 }
 
 func (ds *DynamicDiscoveryMaster) addNodeInfo(nodeInfo *rpc.NodeInfo) {
@@ -52,16 +61,26 @@ func (ds *DynamicDiscoveryMaster) addNodeInfo(nodeInfo *rpc.NodeInfo) {
 		return
 	}
 
-	_, ok := ds.mapNodeInfo[nodeInfo.NodeId]
+	if _, ok := ds.mapNodeInfo[nodeInfo.Version]; !ok {
+		ds.mapNodeInfo[nodeInfo.Version] = map[int32]struct{}{}
+	}
+	_, ok := ds.mapNodeInfo[nodeInfo.Version][nodeInfo.NodeId]
 	if ok == true {
 		return
 	}
-	ds.mapNodeInfo[nodeInfo.NodeId] = struct{}{}
+	ds.mapNodeInfo[nodeInfo.Version][nodeInfo.NodeId] = struct{}{}
+
 	ds.nodeInfo = append(ds.nodeInfo, nodeInfo)
 }
 
 func (ds *DynamicDiscoveryMaster) OnInit() error {
-	ds.mapNodeInfo = make(map[int32]struct{}, 20)
+	mapList := make(map[int32]map[int32]struct{}, ds.nodeMapSize)
+
+	for i := range mapList {
+		mapList[i] = make(map[int32]struct{}, 1000)
+	}
+
+	ds.mapNodeInfo = mapList
 	ds.RegRpcListener(ds)
 
 	return nil

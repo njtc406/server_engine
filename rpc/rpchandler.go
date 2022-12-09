@@ -73,11 +73,14 @@ type RpcHandler struct {
 }
 
 type TriggerRpcEvent func(bConnect bool, clientSeq uint32, nodeId int)
+
+// 节点监听器
 type INodeListener interface {
 	OnNodeConnected(nodeId int)
 	OnNodeDisconnect(nodeId int)
 }
 
+// 服务发现监听器
 type IDiscoveryServiceListener interface {
 	OnDiscoveryService(nodeId int, serviceName []string)
 	OnUnDiscoveryService(nodeId int, serviceName []string)
