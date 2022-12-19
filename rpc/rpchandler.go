@@ -72,11 +72,11 @@ type RpcHandler struct {
 	pClientList []*Client //rpc客户端列表
 }
 
-type TriggerRpcEvent func(bConnect bool, clientSeq uint32, nodeId int)
+type TriggerRpcEvent func(bConnect bool, clientSeq uint32, nodeId, version int)
 
 // 节点监听器
 type INodeListener interface {
-	OnNodeConnected(nodeId int)
+	OnNodeConnected(nodeId, version int)
 	OnNodeDisconnect(nodeId int)
 }
 

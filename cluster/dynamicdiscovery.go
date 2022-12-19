@@ -17,11 +17,10 @@ const defaultNodeMapSize = 100
 
 type DynamicDiscoveryMaster struct {
 	service.Service
-	nodeMapSize  uint32                  //节点列表的大小
-	globNodeInfo map[int32]struct{}      //全局节点列表(version为0表示全局节点,全局节点对所有其他节点可见)
-	mapNodeInfo  map[int32]struct{}      //节点列表 map[nodeId]nodeInfo
-	versionMap   map[int32]map[int32]int //版本节点列表 map[version]map[nodeId]int
-	nodeInfo     []*rpc.NodeInfo
+	nodeMapSize uint32                          //节点列表的大小
+	mapNodeInfo map[int32]int                   //节点列表映射 map[nodeId]version
+	globNodeMap map[int32]*rpc.NodeInfo         //全局节点列表 map[nodeId]rpc.NodeInfo (version为0表示全局节点,全局节点对所有其他节点可见)
+	nodeInfo    map[int]map[int32]*rpc.NodeInfo //节点信息数据 map[version]map[nodeId][]*rpc.NodeInfo
 }
 
 type DynamicDiscoveryClient struct {
@@ -46,44 +45,64 @@ func init() {
 	clientService.SetName(DynamicDiscoveryClientName)
 }
 
-func (ds *DynamicDiscoveryMaster) isRegNode(nodeId, version int32) bool {
-	var retOK bool
-	if _, ok := ds.mapNodeInfo[version]; ok {
-		_, ok = ds.mapNodeInfo[version][nodeId]
-		retOK = ok
-	}
+func (ds *DynamicDiscoveryMaster) OnInit() error {
+	ds.nodeMapSize = defaultNodeMapSize
+	ds.mapNodeInfo = make(map[int32]int, ds.nodeMapSize)
+	ds.nodeInfo = make(map[int]map[int32]*rpc.NodeInfo, ds.nodeMapSize)
+	ds.RegRpcListener(ds)
 
-	return retOK
+	return nil
 }
 
+func (ds *DynamicDiscoveryMaster) isRegNode(nodeId int32) bool {
+	_, ok := ds.mapNodeInfo[nodeId]
+	return ok
+}
+
+// addNodeInfo 增加节点信息
 func (ds *DynamicDiscoveryMaster) addNodeInfo(nodeInfo *rpc.NodeInfo) {
 	if len(nodeInfo.PublicServiceList) == 0 {
 		return
 	}
 
-	if _, ok := ds.mapNodeInfo[nodeInfo.Version]; !ok {
-		ds.mapNodeInfo[nodeInfo.Version] = map[int32]struct{}{}
-	}
-	_, ok := ds.mapNodeInfo[nodeInfo.Version][nodeInfo.NodeId]
-	if ok == true {
+	//已经注册过的节点
+	if _, ok := ds.mapNodeInfo[nodeInfo.NodeId]; ok {
 		return
 	}
-	ds.mapNodeInfo[nodeInfo.Version][nodeInfo.NodeId] = struct{}{}
 
-	ds.nodeInfo = append(ds.nodeInfo, nodeInfo)
+	ds.mapNodeInfo[nodeInfo.NodeId] = nodeInfo.Version
+
+	if nodeInfo.Version > 0 {
+		if _, ok := ds.nodeInfo[nodeInfo.Version]; !ok {
+			ds.nodeInfo[nodeInfo.Version] = make(map[int32]*rpc.NodeInfo, ds.nodeMapSize)
+		}
+		ds.nodeInfo[nodeInfo.Version][nodeInfo.NodeId] = nodeInfo
+	} else {
+		//全局节点
+		ds.globNodeMap[nodeInfo.NodeId] = nodeInfo
+	}
 }
 
-func (ds *DynamicDiscoveryMaster) OnInit() error {
-	mapList := make(map[int32]map[int32]struct{}, ds.nodeMapSize)
-
-	for i := range mapList {
-		mapList[i] = make(map[int32]struct{}, 1000)
+// delNodeInfo 删除节点信息
+func (ds *DynamicDiscoveryMaster) delNodeInfo(nodeId int) {
+	if ds.isRegNode(int32(nodeId)) == false {
+		return
+	}
+	if nodeId == cluster.GetLocalNodeId() {
+		return
 	}
 
-	ds.mapNodeInfo = mapList
-	ds.RegRpcListener(ds)
+	version := ds.mapNodeInfo[int32(nodeId)]
 
-	return nil
+	if version > 0 {
+		//非全局节点
+		delete(ds.nodeInfo[version], int32(nodeId))
+	} else {
+		//全局节点
+		delete(ds.globNodeMap, int32(nodeId))
+	}
+
+	delete(ds.mapNodeInfo, int32(nodeId))
 }
 
 func (ds *DynamicDiscoveryMaster) OnStart() {
@@ -95,6 +114,7 @@ func (ds *DynamicDiscoveryMaster) OnStart() {
 
 	nodeInfo.NodeId = int32(localNodeInfo.NodeId)
 	nodeInfo.NodeName = localNodeInfo.NodeName
+	nodeInfo.Version = localNodeInfo.Version
 	nodeInfo.ListenAddr = localNodeInfo.ListenAddr
 	nodeInfo.PublicServiceList = localNodeInfo.PublicServiceList
 	nodeInfo.MaxRpcParamLen = localNodeInfo.MaxRpcParamLen
@@ -102,17 +122,43 @@ func (ds *DynamicDiscoveryMaster) OnStart() {
 	ds.addNodeInfo(&nodeInfo)
 }
 
-func (ds *DynamicDiscoveryMaster) OnNodeConnected(nodeId int) {
+func (ds *DynamicDiscoveryMaster) OnNodeConnected(nodeId, version int) {
 	//没注册过结点不通知
 	if ds.isRegNode(int32(nodeId)) == false {
 		return
 	}
 
-	//向它发布所有服务列表信息
+	//向它发布可分配服务列表信息
 	var notifyDiscover rpc.SubscribeDiscoverNotify
 	notifyDiscover.IsFull = true
-	notifyDiscover.NodeInfo = ds.nodeInfo
 	notifyDiscover.MasterNodeId = int32(cluster.GetLocalNodeInfo().NodeId)
+
+	var nodeList []*rpc.NodeInfo
+	if version > 0 {
+		//非全局节点(部分节点可见)
+		for _, nodeInfo := range ds.nodeInfo[version] {
+			nodeList = append(nodeList, nodeInfo)
+		}
+
+		for _, nodeInfo := range ds.globNodeMap {
+			nodeList = append(nodeList, nodeInfo)
+		}
+
+		notifyDiscover.NodeInfo = nodeList
+	} else {
+		//全局节点(所有节点可见)
+		for _, versionList := range ds.nodeInfo {
+			for _, nodeInfo := range versionList {
+				nodeList = append(nodeList, nodeInfo)
+			}
+		}
+
+		for _, nodeInfo := range ds.globNodeMap {
+			nodeList = append(nodeList, nodeInfo)
+		}
+
+		notifyDiscover.NodeInfo = nodeList
+	}
 
 	ds.GoNode(nodeId, SubServiceDiscover, &notifyDiscover)
 }
@@ -121,6 +167,9 @@ func (ds *DynamicDiscoveryMaster) OnNodeDisconnect(nodeId int) {
 	if ds.isRegNode(int32(nodeId)) == false {
 		return
 	}
+
+	//删除节点
+	ds.delNodeInfo(nodeId)
 
 	var notifyDiscover rpc.SubscribeDiscoverNotify
 	notifyDiscover.MasterNodeId = int32(cluster.GetLocalNodeInfo().NodeId)
@@ -160,6 +209,7 @@ func (ds *DynamicDiscoveryMaster) RPC_RegServiceDiscover(req *rpc.ServiceDiscove
 	var nodeInfo NodeInfo
 	nodeInfo.NodeId = int(req.NodeInfo.NodeId)
 	nodeInfo.NodeName = req.NodeInfo.NodeName
+	nodeInfo.Version = req.NodeInfo.Version
 	nodeInfo.Private = req.NodeInfo.Private
 	nodeInfo.ServiceList = req.NodeInfo.PublicServiceList
 	nodeInfo.PublicServiceList = req.NodeInfo.PublicServiceList
@@ -342,7 +392,7 @@ func (dc *DynamicDiscoveryClient) isDiscoverNode(nodeId int) bool {
 	return false
 }
 
-func (dc *DynamicDiscoveryClient) OnNodeConnected(nodeId int) {
+func (dc *DynamicDiscoveryClient) OnNodeConnected(nodeId, version int) {
 	nodeInfo := cluster.GetMasterDiscoveryNodeInfo(nodeId)
 	if nodeInfo == nil {
 		return

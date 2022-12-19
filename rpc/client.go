@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"github.com/njtc406/server_engine/cluster"
 	"github.com/njtc406/server_engine/log"
 	"github.com/njtc406/server_engine/network"
 	"math"
@@ -302,7 +303,7 @@ func (client *Client) Run() {
 	}()
 
 	//将请求加入rpc事件队列,等待执行
-	client.TriggerRpcEvent(true, client.GetClientSeq(), client.GetId())
+	client.TriggerRpcEvent(true, client.GetClientSeq(), client.GetId(), cluster.GetCluster().GetVersion())
 	for {
 		//等待回复
 		bytes, err := client.conn.ReadMsg()
@@ -362,7 +363,7 @@ func (client *Client) Run() {
 }
 
 func (client *Client) OnClose() {
-	client.TriggerRpcEvent(false, client.GetClientSeq(), client.GetId())
+	client.TriggerRpcEvent(false, client.GetClientSeq(), client.GetId(), cluster.GetCluster().GetVersion())
 }
 
 func (client *Client) IsConnected() bool {

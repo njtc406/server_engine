@@ -66,6 +66,7 @@ type Service struct {
 type RpcConnEvent struct {
 	IsConnect bool
 	NodeId    int
+	Version   int
 }
 
 // DiscoveryServiceEvent 发现服务结点
@@ -281,7 +282,7 @@ func (s *Service) OnStart() {
 func (s *Service) OnNodeEvent(ev event.IEvent) {
 	event := ev.(*RpcConnEvent)
 	if event.IsConnect {
-		s.nodeEventLister.OnNodeConnected(event.NodeId)
+		s.nodeEventLister.OnNodeConnected(event.NodeId, event.Version)
 	} else {
 		s.nodeEventLister.OnNodeDisconnect(event.NodeId)
 	}

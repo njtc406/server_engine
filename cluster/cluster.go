@@ -23,6 +23,7 @@ const (
 type NodeInfo struct {
 	NodeId            int
 	NodeName          string
+	Version           int
 	Private           bool
 	ListenAddr        string
 	MaxRpcParamLen    uint32   //最大Rpc参数长度
@@ -69,6 +70,14 @@ func SetConfigDir(cfgDir string) {
 
 func SetServiceDiscovery(serviceDiscovery IServiceDiscovery) {
 	cluster.serviceDiscovery = serviceDiscovery
+}
+
+func (cls *Cluster) GetVersion() int {
+	return cls.localNodeInfo.Version
+}
+
+func (cls *Cluster) GetLocalNodeId() int {
+	return cls.localNodeInfo.NodeId
 }
 
 func (cls *Cluster) Start() {
@@ -301,7 +310,6 @@ func (cls *Cluster) SetupServiceDiscovery(localNodeId int, setupServiceFun Setup
 		cls.appendService(DynamicDiscoveryMasterName, false)
 	}
 	cls.appendService(DynamicDiscoveryClientName, true)
-
 }
 
 func (cls *Cluster) FindRpcHandler(serviceName string) rpc.IRpcHandler {
@@ -357,7 +365,7 @@ func (cls *Cluster) IsNodeConnected(nodeId int) bool {
 	return pClient != nil && pClient.IsConnected()
 }
 
-func (cls *Cluster) triggerRpcEvent(bConnect bool, clientSeq uint32, nodeId int) {
+func (cls *Cluster) triggerRpcEvent(bConnect bool, clientSeq uint32, nodeId, version int) {
 	cls.locker.Lock()
 	nodeInfo, ok := cls.mapRpc[nodeId]
 	if ok == false || nodeInfo.client == nil || nodeInfo.client.GetClientSeq() != clientSeq {
@@ -378,6 +386,7 @@ func (cls *Cluster) triggerRpcEvent(bConnect bool, clientSeq uint32, nodeId int)
 		var eventData service.RpcConnEvent
 		eventData.IsConnect = bConnect
 		eventData.NodeId = nodeId
+		eventData.Version = version
 		ser.(service.IModule).NotifyEvent(&eventData)
 	}
 }
